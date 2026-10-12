@@ -13,7 +13,8 @@
     "db:migrate": "node scripts/migrate.mjs",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
-    "cf:secret:database": "node scripts/set-cloudflare-database-secret.mjs"
+    "cf:secret:database": "node scripts/set-cloudflare-database-secret.mjs",
+    "cf:secret:payments": "node scripts/set-cloudflare-payment-secrets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

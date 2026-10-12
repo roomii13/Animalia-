@@ -17,6 +17,7 @@ export default function RootLayout() {
       <Stack.Screen name="profile/edit" options={{ title: 'Editar perfil' }} />
       <Stack.Screen name="admin/dashboard" options={{ title: 'Administración' }} />
       <Stack.Screen name="legal" options={{ title: 'Cuidado de la comunidad' }} />
+      <Stack.Screen name="donate" options={{ title: 'Aporte solidario' }} />
     </Stack>
   </SafeAreaProvider></AuthProvider>;
 }

@@ -24,6 +24,11 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, tok
       INVALID_POST: 'Revisá los datos del aviso e intentá de nuevo.',
       UNAUTHENTICATED: 'Iniciá sesión para continuar.',
       DATABASE_UNAVAILABLE: 'El servicio de datos no está disponible en este momento.',
+      INVALID_CONTRIBUTION_AMOUNT: 'Ingresá un importe positivo con hasta dos decimales.',
+      PAYMENT_PROVIDER_REJECTED: 'Mercado Pago no pudo iniciar ese aporte. Revisá el importe y probá otra vez.',
+      PAYMENT_PROVIDER_UNAVAILABLE: 'Mercado Pago no está disponible en este momento.',
+      PAYMENTS_UNAVAILABLE: 'Los aportes no están disponibles en este momento.',
+      IDEMPOTENCY_KEY_REUSED: 'Ese intento ya quedó asociado a otro importe. Volvé a iniciar el aporte.',
     };
     throw Object.assign(new Error(messages[code ?? ''] ?? 'No se pudo completar la operación.'), { status: response.status, code }) as ApiFailure;
   }

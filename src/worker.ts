@@ -1,7 +1,16 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
+import {
+  createMercadoPagoOrder,
+  getMercadoPagoOrder,
+  verifyMercadoPagoWebhookSignature,
+  type MercadoPagoOrder,
+} from '../lib/payments/mercadopago';
 
 interface Env {
   DATABASE_URL?: string;
+  MERCADOPAGO_ACCESS_TOKEN?: string;
+  MERCADOPAGO_WEBHOOK_SECRET?: string;
+  PUBLIC_APP_URL?: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
 }
 
@@ -34,7 +43,7 @@ const TINTS: Record<(typeof KINDS)[number], string> = {
 function corsHeaders(request: Request): Headers {
   const headers = new Headers({
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key',
     'Access-Control-Max-Age': '86400',
     'Cache-Control': 'no-store',
     'Vary': 'Origin',
@@ -158,6 +167,54 @@ const POST_SELECT = `SELECT p.id, p.kind, p.title, p.description, p.animal_name,
   p.locality, p.image_url, p.created_at, u.username, u.display_name
   FROM public.posts p JOIN public.profiles u ON u.id = p.author_id`;
 
+function canonicalArsAmount(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().replace(',', '.');
+  const match = normalized.match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  if (!match) return null;
+  try {
+    const whole = BigInt(match[1]);
+    const fraction = BigInt((match[2] ?? '').padEnd(2, '0') || '0');
+    if (whole * BigInt(100) + fraction <= BigInt(0)) return null;
+  } catch {
+    return null;
+  }
+  return `${BigInt(match[1]).toString()}.${(match[2] ?? '').padEnd(2, '0')}`;
+}
+
+function checkoutUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && /(^|\.)mercadopago\.com(?:\.ar)?$/i.test(url.hostname) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function paymentStatus(order: MercadoPagoOrder, expectedAmount: string): 'pending' | 'approved' | 'cancelled' | 'refunded' | 'review' {
+  const status = order.status?.toLowerCase();
+  const paymentStatuses = order.transactions?.payments?.map((payment) => payment.status?.toLowerCase()) ?? [];
+  if (status === 'refunded' || paymentStatuses.some((value) => value === 'refunded')) return 'refunded';
+  if (status === 'cancelled' || status === 'canceled') return 'cancelled';
+  if (status === 'processed') {
+    return canonicalArsAmount(order.total_paid_amount ?? order.total_amount) === expectedAmount ? 'approved' : 'review';
+  }
+  if (status === 'charged_back' || status === 'in_mediation' || paymentStatuses.some((value) => value === 'charged_back' || value === 'in_mediation')) return 'review';
+  return 'pending';
+}
+
+function contributionResponse(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    amount: row.amount,
+    currency: row.currency,
+    status: row.status,
+    createdAt: row.created_at,
+    approvedAt: row.approved_at,
+  };
+}
+
 async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request) });
   if (!env.DATABASE_URL) return json(request, { error: 'DATABASE_UNAVAILABLE' }, 503);
@@ -168,6 +225,182 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     if (path === '/api/health' && request.method === 'GET') {
       await sql`SELECT 1`;
       return json(request, { ok: true, database: 'connected' });
+    }
+
+    if (path === '/api/payments/webhook' && request.method === 'POST') {
+      if (!env.MERCADOPAGO_WEBHOOK_SECRET || !env.MERCADOPAGO_ACCESS_TOKEN) {
+        return json(request, { error: 'PAYMENTS_UNAVAILABLE' }, 503);
+      }
+      const url = new URL(request.url);
+      const dataId = url.searchParams.get('data.id') ?? url.searchParams.get('id');
+      const requestId = request.headers.get('x-request-id');
+      const signatureIsValid = await verifyMercadoPagoWebhookSignature(
+        request.headers.get('x-signature'),
+        requestId,
+        dataId,
+        env.MERCADOPAGO_WEBHOOK_SECRET,
+      );
+      if (!signatureIsValid) return json(request, { error: 'INVALID_WEBHOOK_SIGNATURE' }, 401);
+
+      const notification = await readJson(request);
+      const notificationType = url.searchParams.get('type') ?? notification?.type;
+      if (notificationType && notificationType !== 'order') return json(request, { ok: true, ignored: true });
+      if (!dataId || !/^[A-Za-z0-9_-]{6,80}$/.test(dataId)) return json(request, { error: 'INVALID_ORDER_ID' }, 400);
+
+      const orderResponse = await getMercadoPagoOrder(env.MERCADOPAGO_ACCESS_TOKEN, dataId);
+      const orderPayload: unknown = await orderResponse.json().catch(() => null);
+      if (!orderResponse.ok || !isRecord(orderPayload)) {
+        console.error('Mercado Pago order lookup failed', orderResponse.status);
+        return json(request, { error: 'PAYMENT_PROVIDER_UNAVAILABLE' }, 502);
+      }
+
+      const order = orderPayload as unknown as MercadoPagoOrder;
+      if (order.id !== dataId || !order.external_reference || !/^[0-9a-f-]{36}$/i.test(order.external_reference)) {
+        return json(request, { ok: true, ignored: true });
+      }
+      const contributions = await sql`SELECT id, amount::text AS amount, currency, mp_order_id
+        FROM public.payment_contributions WHERE id = ${order.external_reference}::uuid LIMIT 1`;
+      const contribution = contributions[0] as Record<string, unknown> | undefined;
+      if (!contribution) return json(request, { ok: true, ignored: true });
+
+      const expectedAmount = canonicalArsAmount(contribution.amount);
+      const orderAmount = canonicalArsAmount(order.total_amount);
+      const paidAmount = canonicalArsAmount(order.total_paid_amount ?? order.total_amount);
+      const currencyMatches = contribution.currency === 'ARS' && order.currency === 'ARS';
+      const orderMatches = contribution.mp_order_id === null || contribution.mp_order_id === order.id;
+      const detailsMatch = order.type === 'online' && order.processing_mode === 'manual'
+        && expectedAmount !== null && expectedAmount === orderAmount;
+      const nextStatus = !currencyMatches || !orderMatches || !detailsMatch
+        ? 'review'
+        : paymentStatus(order, expectedAmount);
+      const safeStatus = nextStatus === 'approved' && paidAmount !== expectedAmount ? 'review' : nextStatus;
+
+      const eventIdentifier = typeof notification?.id === 'string' || typeof notification?.id === 'number'
+        ? String(notification.id)
+        : requestId ?? `${dataId}:${request.headers.get('x-signature') ?? ''}`;
+      const eventId = `order:${eventIdentifier}`.slice(0, 256);
+      const paymentId = order.transactions?.payments?.find((payment) => typeof payment.id === 'string')?.id ?? null;
+      await sql`
+        WITH accepted_event AS (
+          INSERT INTO public.payment_webhook_events (event_id, mp_order_id)
+          VALUES (${eventId}, ${dataId})
+          ON CONFLICT (event_id) DO NOTHING
+          RETURNING event_id
+        )
+        UPDATE public.payment_contributions
+        SET mp_order_id = COALESCE(mp_order_id, ${dataId}),
+            mp_payment_id = COALESCE(${paymentId}, mp_payment_id),
+            status = ${safeStatus},
+            provider_status = ${order.status ?? 'unknown'},
+            provider_status_detail = ${order.status_detail ?? null},
+            approved_at = CASE WHEN ${safeStatus} = 'approved' THEN COALESCE(approved_at, now()) ELSE approved_at END,
+            updated_at = now()
+        WHERE id = ${contribution.id} AND (mp_order_id IS NULL OR mp_order_id = ${dataId})
+          AND EXISTS (SELECT 1 FROM accepted_event)
+      `;
+      return json(request, { ok: true });
+    }
+
+    if (path === '/api/payments' && request.method === 'GET') {
+      const profile = await currentProfile(request, sql);
+      if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
+      const rows = await sql`SELECT id, amount::text AS amount, currency, status, created_at, approved_at
+        FROM public.payment_contributions WHERE profile_id = ${profile.id}
+        ORDER BY created_at DESC LIMIT 100`;
+      return json(request, { contributions: rows.map((row) => contributionResponse(row as Record<string, unknown>)) });
+    }
+
+    if (path === '/api/payments/checkout' && request.method === 'POST') {
+      if (!env.MERCADOPAGO_ACCESS_TOKEN) return json(request, { error: 'PAYMENTS_UNAVAILABLE' }, 503);
+      const profile = await currentProfile(request, sql);
+      if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
+      const body = await readJson(request);
+      const amount = canonicalArsAmount(body?.amount);
+      if (!amount) return json(request, { error: 'INVALID_CONTRIBUTION_AMOUNT' }, 400);
+
+      const requestKey = request.headers.get('Idempotency-Key') ?? crypto.randomUUID();
+      if (!/^[A-Za-z0-9._:-]{1,128}$/.test(requestKey)) {
+        return json(request, { error: 'INVALID_IDEMPOTENCY_KEY' }, 400);
+      }
+      const intents = await sql`
+        INSERT INTO public.payment_contributions (profile_id, idempotency_key, amount)
+        VALUES (${profile.id}, ${requestKey}, ${amount})
+        ON CONFLICT (profile_id, idempotency_key)
+        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+        RETURNING id, amount::text AS amount, currency, status, mp_order_id, checkout_url, created_at, approved_at
+      `;
+      const intent = intents[0] as Record<string, unknown>;
+      if (canonicalArsAmount(intent.amount) !== amount) {
+        return json(request, { error: 'IDEMPOTENCY_KEY_REUSED' }, 409);
+      }
+      if (intent.status !== 'pending') return json(request, { error: 'CONTRIBUTION_ALREADY_PROCESSED' }, 409);
+      if (typeof intent.checkout_url === 'string') {
+        return json(request, { contribution: contributionResponse(intent), checkoutUrl: intent.checkout_url });
+      }
+
+      const payerRows = await sql`SELECT email FROM public.account_credentials WHERE profile_id = ${profile.id} LIMIT 1`;
+      const payerEmail = (payerRows[0] as { email?: string } | undefined)?.email;
+      if (!payerEmail) return json(request, { error: 'ACCOUNT_EMAIL_UNAVAILABLE' }, 409);
+
+      let appUrl: URL;
+      try {
+        appUrl = new URL(env.PUBLIC_APP_URL ?? 'https://animalia.rom-cel.workers.dev');
+      } catch {
+        return json(request, { error: 'PAYMENTS_UNAVAILABLE' }, 503);
+      }
+      if (appUrl.protocol !== 'https:') return json(request, { error: 'PAYMENTS_UNAVAILABLE' }, 503);
+
+      const returnUrl = (result: string) => `${appUrl.origin}/payment-return.html?result=${result}`;
+      const mpResponse = await createMercadoPagoOrder(env.MERCADOPAGO_ACCESS_TOKEN, String(intent.id), {
+        type: 'online',
+        processing_mode: 'manual',
+        total_amount: amount,
+        external_reference: String(intent.id),
+        description: 'Aporte general a Animalia',
+        payer: { email: payerEmail },
+        items: [{
+          external_code: 'ANIMALIA-CONTRIBUTION',
+          title: 'Aporte general a Animalia',
+          description: 'Aporte voluntario para sostener Animalia',
+          quantity: 1,
+          unit_price: amount,
+        }],
+        config: {
+          statement_descriptor: 'ANIMALIA',
+          online: {
+            success_url: returnUrl('success'),
+            failure_url: returnUrl('failure'),
+            pending_url: returnUrl('pending'),
+            auto_return: 'approved',
+          },
+        },
+      });
+      const providerResult: unknown = await mpResponse.json().catch(() => null);
+      if (!mpResponse.ok || !isRecord(providerResult)) {
+        console.error('Mercado Pago order creation failed', mpResponse.status);
+        const status = mpResponse.status === 400 || mpResponse.status === 422 ? 422 : 502;
+        const error = status === 422 ? 'PAYMENT_PROVIDER_REJECTED' : 'PAYMENT_PROVIDER_UNAVAILABLE';
+        return json(request, { error }, status);
+      }
+
+      const createdOrder = providerResult as unknown as MercadoPagoOrder;
+      const safeCheckoutUrl = checkoutUrl(createdOrder.checkout_url);
+      if (!createdOrder.id || createdOrder.external_reference !== String(intent.id)
+        || canonicalArsAmount(createdOrder.total_amount) !== amount || createdOrder.currency !== 'ARS' || !safeCheckoutUrl) {
+        console.error('Mercado Pago order response requires review');
+        await sql`UPDATE public.payment_contributions SET status = 'review', updated_at = now() WHERE id = ${intent.id}`;
+        return json(request, { error: 'PAYMENT_ORDER_REQUIRES_REVIEW' }, 502);
+      }
+
+      const saved = await sql`UPDATE public.payment_contributions
+        SET mp_order_id = ${createdOrder.id}, checkout_url = ${safeCheckoutUrl},
+            provider_status = ${createdOrder.status ?? 'created'},
+            provider_status_detail = ${createdOrder.status_detail ?? null}, updated_at = now()
+        WHERE id = ${intent.id} AND status = 'pending'
+        RETURNING id, amount::text AS amount, currency, status, created_at, approved_at`;
+      const contribution = saved[0] as Record<string, unknown> | undefined;
+      if (!contribution) return json(request, { error: 'CONTRIBUTION_ALREADY_PROCESSED' }, 409);
+      return json(request, { contribution: contributionResponse(contribution), checkoutUrl: safeCheckoutUrl }, 201);
     }
 
     if (path === '/api/posts' && request.method === 'GET') {

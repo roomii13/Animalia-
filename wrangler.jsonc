@@ -4,6 +4,9 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-12",
   "preview_urls": false,
+  "vars": {
+    "PUBLIC_APP_URL": "https://animalia.rom-cel.workers.dev"
+  },
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
