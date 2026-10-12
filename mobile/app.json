@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Animalia",
+    "slug": "animalia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "scheme": "animalia",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/animalia-icon.png",
+    "ios": {
+      "supportsTablet": false,
+      "deploymentTarget": "15.1",
+      "bundleIdentifier": "com.animalia.comunidad"
+    },
+    "android": {
+      "package": "com.animalia.comunidad",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/animalia-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Animalia necesita acceso a tus fotos para adjuntar imágenes de animales y avisos.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/animalia-icon.png",
+          "resizeMode": "contain",
+          "imageWidth": 180,
+          "backgroundColor": "#f8f5ef"
+        }
+      ],
+      "expo-secure-store"
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 40 33% 96%;
+  --foreground: 139 21% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 139 21% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 139 21% 18%;
+  --primary: 112 22% 31%;
+  --primary-foreground: 40 33% 97%;
+  --secondary: 92 23% 92%;
+  --secondary-foreground: 112 22% 31%;
+  --muted: 96 18% 93%;
+  --muted-foreground: 126 10% 48%;
+  --accent: 31 77% 65%;
+  --accent-foreground: 139 21% 18%;
+  --destructive: 13 61% 53%;
+  --destructive-foreground: 40 33% 97%;
+  --border: 99 19% 87%;
+  --input: 99 19% 87%;
+  --ring: 112 22% 31%;
+  --chart-1: 112 22% 31%;
+  --chart-2: 31 77% 65%;
+  --chart-3: 13 61% 53%;
+  --chart-4: 82 25% 53%;
+  --chart-5: 39 54% 53%;
+  --radius: 0.75rem;
+}
+
+* { @apply border-border; }
+html { scroll-behavior: smooth; }
+body { @apply bg-background text-foreground; }
+button, a { -webkit-tap-highlight-color: transparent; }
+.font-serif { font-family: Georgia, 'Times New Roman', serif; }
+

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f8f5ef">
+    <meta name="description" content="Animalia: una comunidad para el bienestar animal, el rescate y la adopción responsable.">
+    <title>Animalia — una comunidad que cuida</title>
+    <link rel="icon" href="/icons/animalia-logo.png" type="image/png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <style>
+      :root { color-scheme: light; --green: #31563a; --green-soft: #e8efe3; --ink: #26392c; --muted: #718075; --orange: #f2a128; --paper: #f8f5ef; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+      a { color: inherit; }
+      .wrap { width: min(100% - 32px, 1080px); margin-inline: auto; }
+      header { display: flex; align-items: center; justify-content: space-between; min-height: 76px; gap: 16px; }
+      .brand { display: flex; align-items: center; gap: 10px; color: var(--green); font-weight: 750; text-decoration: none; }
+      .brand img { width: 46px; height: 46px; object-fit: contain; border-radius: 14px; background: white; }
+      .brand span { display: block; font-size: 1.25rem; line-height: 1.1; }
+      .brand small { display: block; margin-top: 4px; color: #9b6c3d; font-size: .58rem; letter-spacing: .16em; text-transform: uppercase; }
+      .button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 13px; background: var(--green); color: white; font-weight: 700; text-decoration: none; }
+      .hero { position: relative; overflow: hidden; margin: 20px auto 0; padding: clamp(28px, 7vw, 70px); border-radius: 30px; background: var(--green); color: #fffaf2; }
+      .hero:after { position: absolute; right: -60px; bottom: -130px; width: 290px; height: 290px; border: 38px solid #71876b55; border-radius: 50%; content: ""; }
+      .eyebrow { color: #edba72; font-size: .75rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+      h1, h2 { font-family: Georgia, "Times New Roman", serif; line-height: 1.08; letter-spacing: -.035em; }
+      h1 { max-width: 730px; margin: 14px 0; font-size: clamp(2.4rem, 8vw, 4.4rem); }
+      .hero p { max-width: 620px; color: #dce9d8; }
+      .hero .button { margin-top: 14px; background: var(--orange); color: #3b4029; }
+      section { padding-block: 42px; }
+      .lead { max-width: 680px; color: var(--muted); }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; margin-top: 20px; }
+      .card { padding: 20px; border: 1px solid #e0e7dc; border-radius: 20px; background: #fff; }
+      .card h3 { margin: 0 0 7px; color: var(--green); }
+      .card p { margin: 0; color: var(--muted); font-size: .94rem; }
+      .notice { padding: 18px 20px; border: 1px solid #efd9b4; border-radius: 18px; background: #fffaf1; color: #735b3d; }
+      footer { padding: 22px 0 max(24px, env(safe-area-inset-bottom)); border-top: 1px solid #dce4d8; color: var(--muted); font-size: .85rem; }
+      @media (max-width: 520px) { .wrap { width: min(100% - 24px, 1080px); } header { min-height: 68px; } header > .button { padding-inline: 12px; font-size: .82rem; } .hero { margin-top: 10px; border-radius: 24px; } section { padding-block: 30px; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <a class="brand" href="/about.html" aria-label="Animalia, información">
+          <img src="/icons/animalia-logo.png" alt="">
+          <span>Animalia<small>comunidad que cuida</small></span>
+        </a>
+        <a class="button" href="#app-movil">App móvil</a>
+      </header>
+      <main>
+        <section class="hero">
+          <span class="eyebrow">Bienestar animal en comunidad</span>
+          <h1>Una red para cuidar, proteger y volver a encontrarnos.</h1>
+          <p>Animalia propone un espacio móvil para conectar a personas, familias, refugios y organizaciones que trabajan por los animales.</p>
+          <a class="button" href="#app-movil">Conocer la app móvil</a>
+        </section>
+        <section>
+          <span class="eyebrow">Una app para llevar con vos</span>
+          <h2 id="app-movil">Animalia se está preparando para iOS y Android.</h2>
+          <p class="lead">Animalia se está desarrollando como aplicación móvil. El registro y los avisos básicos ya están conectados a la base de datos; la app todavía no está publicada para descargar.</p>
+        </section>
+        <section>
+          <span class="eyebrow">Qué queremos hacer</span>
+          <h2>La ayuda empieza cuando nos encontramos.</h2>
+          <p class="lead">La comunidad reunirá información útil para acompañar situaciones cotidianas y urgentes, con foco en el respeto, la responsabilidad y el cuidado.</p>
+          <div class="grid">
+            <article class="card"><h3>Adopción responsable</h3><p>Conectar animales que buscan un hogar con familias preparadas para cuidarlos.</p></article>
+            <article class="card"><h3>Animales perdidos</h3><p>Compartir avisos para ayudar a reunir a cada animal con su familia.</p></article>
+            <article class="card"><h3>Rescates y colaboración</h3><p>Difundir pedidos de ayuda y acercar personas dispuestas a colaborar.</p></article>
+            <article class="card"><h3>Actividades comunitarias</h3><p>Organizar encuentros, campañas y acciones locales de bienestar animal.</p></article>
+          </div>
+        </section>
+        <section id="solidaridad">
+          <div class="notice"><strong>Proyecto en desarrollo.</strong> La web presenta Animalia y no permite crear cuentas. La app móvil aún no está publicada; fotos, mensajería y pagos se habilitarán cuando estén terminados sus servicios. Mercado Pago queda pendiente de configuración.</div>
+        </section>
+      </main>
+      <footer>Animalia · Propuesta comunitaria en desarrollo · <a href="/legal/privacy">Privacidad</a> · <a href="/legal/terms">Términos</a> · <a href="/legal/community-guidelines">Normas de la comunidad</a></footer>
+    </div>
+  </body>
+</html>
