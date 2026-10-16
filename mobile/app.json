@@ -17,7 +17,7 @@
       "bundleIdentifier": "com.animalia.comunidad"
     },
     "android": {
-      "package": "com.animalia.comunidad",
+      "package": "com.rominacelis.animalia",
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/animalia-icon.png",

@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.animalia.comunidad'
+    namespace 'com.rominacelis.animalia'
     defaultConfig {
-        applicationId 'com.animalia.comunidad'
+        applicationId 'com.rominacelis.animalia'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

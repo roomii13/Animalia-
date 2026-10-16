@@ -1,4 +1,4 @@
-package com.animalia.comunidad
+package com.rominacelis.animalia
 
 import android.app.Application
 import android.content.res.Configuration

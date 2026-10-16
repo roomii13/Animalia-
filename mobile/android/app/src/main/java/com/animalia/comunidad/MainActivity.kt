@@ -1,4 +1,4 @@
-package com.animalia.comunidad
+package com.rominacelis.animalia
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
