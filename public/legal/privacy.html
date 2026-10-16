@@ -2,12 +2,68 @@
 <html lang="es-AR">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#f8f5ef">
-    <title>Privacidad — Animalia</title>
+    <meta name="description" content="Política de privacidad de Animalia, comunidad de bienestar y protección animal de La Pampa, Argentina.">
+    <title>Política de privacidad — Animalia</title>
+    <link rel="icon" href="/icons/animalia-logo.png" type="image/png">
     <style>
-      body{margin:0;background:#f8f5ef;color:#26392c;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}.wrap{width:min(100% - 32px,760px);margin:48px auto}.brand{color:#31563a;font-weight:800;text-decoration:none}.card{margin-top:24px;padding:clamp(22px,5vw,40px);border:1px solid #dce4d8;border-radius:22px;background:#fff}h1{color:#31563a;line-height:1.15}h2{margin-top:28px;color:#31563a;font-size:1.1rem}a{color:#31563a}
+      :root{color-scheme:light;--green:#31563a;--ink:#26392c;--muted:#718075;--paper:#f8f5ef;--border:#dce4d8;--orange:#f2a128}
+      *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif}
+      .wrap{width:min(100% - 28px,820px);margin:28px auto 56px}.brand{display:inline-flex;align-items:center;gap:10px;color:var(--green);font-weight:800;text-decoration:none}.brand img{width:42px;height:42px;object-fit:contain;border-radius:12px;background:#fff}
+      article{margin-top:22px;padding:clamp(22px,5vw,44px);border:1px solid var(--border);border-radius:24px;background:#fff;box-shadow:0 12px 40px #26392c0b}
+      .eyebrow{color:#9b6c3d;font-size:.76rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}h1,h2{color:var(--green);line-height:1.2}h1{margin:.5rem 0;font-size:clamp(2rem,7vw,3rem);letter-spacing:-.035em}h2{margin:2rem 0 .5rem;font-size:1.2rem}p,li{color:#47574b}a{color:var(--green)}.updated{color:var(--muted);font-size:.9rem}.notice{margin:20px 0;padding:14px 16px;border:1px solid #efd9b4;border-radius:14px;background:#fffaf1;color:#735b3d}.notice strong{color:#684f2c}
+      footer{padding:22px 4px;color:var(--muted);font-size:.88rem}
     </style>
   </head>
-  <body><main class="wrap"><a class="brand" href="/about.html">Animalia · Volver</a><article class="card"><p>AVISO PRELIMINAR</p><h1>Privacidad</h1><p>La página informativa no solicita ni guarda datos personales. Animalia está desarrollando su app móvil; antes de distribuirla públicamente se publicará un aviso completo con los canales para ejercer derechos y contactar al responsable.</p><h2>Datos usados en las pruebas del servicio</h2><p>El servicio de prueba puede recibir el nombre visible, correo electrónico y tipo de cuenta al registrarse, además del contenido y localidad de los avisos. La contraseña se guarda como hash y el secreto de sesión no se almacena en texto plano en la base de datos. Estos datos se alojan en Neon Postgres para probar las funciones de cuenta y publicaciones.</p><h2>Estado del proyecto</h2><p>La app aún no está publicada para descargar. Este aviso preliminar no reemplaza la política de privacidad que se ofrecerá antes de su lanzamiento.</p></article></main></body>
+  <body>
+    <main class="wrap">
+      <a class="brand" href="/about.html"><img src="/icons/animalia-logo.png" alt=""><span>Animalia · Volver al sitio</span></a>
+      <article>
+        <span class="eyebrow">La Pampa · Argentina</span>
+        <h1>Política de privacidad</h1>
+        <p class="updated">Última actualización: 16 de octubre de 2026</p>
+        <div class="notice"><strong>Borrador pendiente de publicación:</strong> antes de usar esta página en Google Play hay que completar el correo público de privacidad y habilitar la eliminación de cuentas dentro de la app y desde una página externa. Esos canales aún no están implementados.</div>
+        <p>Esta política explica qué información trata Animalia, para qué la usa y qué opciones tienen las personas usuarias. Animalia es una aplicación móvil comunitaria para publicar y consultar avisos de adopción responsable, animales perdidos, rescates, pedidos de ayuda y actividades de bienestar animal. La creadora del proyecto es Romina Celis, en La Pampa, Argentina.</p>
+
+        <h2>Información que tratamos</h2>
+        <ul>
+          <li><strong>Cuenta:</strong> nombre visible, correo electrónico y tipo de cuenta. El sistema genera además un nombre de usuario. La contraseña se procesa para verificar el acceso y se guarda como hash; no se conserva como texto legible.</li>
+          <li><strong>Perfil:</strong> biografía y localidad, si la persona decide agregarlas.</li>
+          <li><strong>Avisos públicos:</strong> categoría, título, descripción y, si la persona los incluye, nombre o especie del animal y localidad. Los avisos y el nombre visible del perfil pueden ser consultados por otras personas.</li>
+          <li><strong>Guardados:</strong> identificadores de los avisos que cada persona guarda, asociados a su cuenta.</li>
+          <li><strong>Seguridad comunitaria:</strong> las cuentas que una persona bloquea y las denuncias enviadas, que incluyen la categoría elegida, la publicación o perfil denunciado y, si se agrega, un detalle. Se asocian a la cuenta que envía el reporte para prevenir abusos y revisar incidentes.</li>
+          <li><strong>Aportes:</strong> importe elegido, destino, estado, fecha e identificadores técnicos de la operación. Estos datos permiten mostrar el historial y conciliar el resultado del pago.</li>
+          <li><strong>Sesión:</strong> un token de autenticación necesario para mantener la cuenta iniciada. La app lo guarda en el almacenamiento seguro del dispositivo.</li>
+        </ul>
+        <p>Actualmente no se reciben fotos en las publicaciones, no se solicita ubicación GPS, y la mensajería directa no está habilitada como función operativa. Si estas funciones se agregan, esta política y la declaración de Seguridad de los datos se actualizarán antes de su lanzamiento.</p>
+
+        <h2>Cómo usamos la información</h2>
+        <p>Usamos estos datos para crear y proteger cuentas, mostrar perfiles y avisos comunitarios, guardar avisos elegidos, gestionar bloqueos y denuncias, iniciar aportes voluntarios, verificar su estado y mantener el servicio. No vendemos datos personales ni usamos la información para publicidad personalizada.</p>
+
+        <h2>Pagos con Mercado Pago</h2>
+        <p>Cuando una persona inicia un aporte, Animalia envía a Mercado Pago los datos necesarios para crear y vincular la operación, como el importe, el destino y el correo asociado a la cuenta. El pago se completa en el entorno de Mercado Pago. Animalia no solicita ni almacena números de tarjeta, códigos de seguridad ni claves bancarias. Mercado Pago trata los datos de pago conforme a sus propios términos y política de privacidad.</p>
+
+        <h2>Proveedores y alojamiento</h2>
+        <p>La página y la API se sirven mediante Cloudflare; los datos de cuentas, perfiles, avisos y operaciones se alojan en Neon Postgres. Mercado Pago interviene cuando se inicia un aporte. Estos proveedores tratan información para prestar sus servicios y pueden procesarla en centros de datos ubicados fuera de Argentina, conforme a sus condiciones y políticas. No integramos SDK de anuncios ni herramientas de analítica en la app actual.</p>
+
+        <h2>Visibilidad y cuidado</h2>
+        <p>Los avisos publicados y los datos del perfil que se muestran en ellos son visibles para la comunidad. Evitá incluir domicilios exactos, teléfonos de terceros u otros datos personales que no sean necesarios. Los datos de acceso, guardados e historial de aportes no se muestran públicamente en el feed.</p>
+
+        <h2>Conservación y eliminación</h2>
+        <p>Conservamos la información mientras la cuenta y el servicio estén activos y mientras sea necesaria para los fines indicados. La eliminación de una cuenta deberá eliminar también los datos asociados; pueden conservarse registros estrictamente necesarios cuando exista una obligación legal, de seguridad o de prevención de fraude, y se informará el motivo y el plazo aplicable. La herramienta para solicitar y ejecutar la eliminación de cuentas todavía debe implementarse; por eso esta política no debe publicarse como definitiva hasta contar con el mecanismo en la app y una vía externa accesible.</p>
+
+        <h2>Seguridad</h2>
+        <p>Aplicamos medidas técnicas para proteger el acceso, como contraseñas almacenadas mediante hash y tokens de sesión protegidos en el dispositivo. Ningún sistema conectado a Internet puede garantizar seguridad absoluta.</p>
+
+        <h2>Derechos y contacto</h2>
+        <p>Las personas pueden solicitar acceso, corrección o supresión de sus datos y hacer consultas sobre privacidad, de acuerdo con la normativa argentina aplicable. La Agencia de Acceso a la Información Pública (AAIP) es el organismo de control; <a href="https://www.argentina.gob.ar/aaip/datospersonales/derechos">consultá tus derechos y cómo reclamar</a>. Para ejercerlos ante Animalia, el canal de contacto debe completarse antes de publicar esta política.</p>
+        <p><strong>Responsable:</strong> Romina Celis · Animalia · La Pampa, Argentina.<br><strong>Correo de privacidad:</strong> [PENDIENTE: agregar correo público de contacto].</p>
+
+        <h2>Cambios a esta política</h2>
+        <p>Podemos actualizar este documento si cambian las funciones, los proveedores o las prácticas de datos. Publicaremos la versión vigente y su fecha de actualización en esta página.</p>
+      </article>
+      <footer>Animalia · Comunidad para el bienestar y la protección animal.</footer>
+    </main>
+  </body>
 </html>

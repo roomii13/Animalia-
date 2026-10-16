@@ -6,6 +6,7 @@ import { colors } from '../../src/theme';
 import type { AnimalPost } from '../../src/data';
 import { apiRequest } from '../../src/api';
 import { useAuth } from '../../src/auth';
+import { SafetyActions } from '../../src/SafetyActions';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,6 +60,7 @@ export default function PostDetailScreen() {
     {post ? <><View style={[styles.cover, { backgroundColor: post.tint }]}><Text style={styles.emoji}>{post.emoji}</Text></View>
       <PageHeading eyebrow={post.type} title={post.title} detail={`${post.animal}  ·  ${post.location}`} />
       <Card><Text style={styles.label}>Sobre este aviso</Text><Text style={styles.description}>{post.description}</Text><Text style={styles.author}>Publicado por {post.author}</Text></Card>
+      {post.username ? <SafetyActions username={post.username} postId={post.id} onBlocked={() => { setPost(null); setError('Bloqueaste esta cuenta. Sus avisos ya no aparecerán en tu comunidad.'); }} /> : null}
       <Notice>Antes de coordinar, confirmá los datos, cuidá tu información personal y priorizá la seguridad del animal.</Notice>
       <ActionButton label={saved ? 'Quitar de guardados' : 'Guardar aviso'} secondary={saved} onPress={() => { void toggleSaved(); }} />
       <Notice>La mensajería dentro de Animalia se habilitará en una próxima etapa.</Notice></> : null}

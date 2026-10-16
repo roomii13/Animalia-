@@ -43,7 +43,14 @@
           "backgroundColor": "#f8f5ef"
         }
       ],
-      "expo-secure-store"
-    ]
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0c9525ac-640e-4012-85b2-b0f175afe146"
+      }
+    }
   }
 }

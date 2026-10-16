@@ -56,9 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const acceptSession = useCallback(async (result: AuthResult) => {
-    await SecureStore.setItemAsync(SESSION_KEY, result.token);
     setToken(result.token);
     setProfile(result.profile);
+    await SecureStore.setItemAsync(SESSION_KEY, result.token).catch(() => {
+      // Keep the new session active in memory if the device's secure storage is temporarily unavailable.
+    });
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {

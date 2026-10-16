@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "0c9525ac-640e-4012-85b2-b0f175afe146"
+      }
+    },
+    "android": {
+      "package": "com.rominacelis.animalia"
+    }
+  }
+}

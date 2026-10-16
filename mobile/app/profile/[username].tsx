@@ -5,12 +5,15 @@ import { Card, Notice, PageHeading, Screen } from '../../src/ui';
 import { colors } from '../../src/theme';
 import { apiRequest } from '../../src/api';
 import type { AuthProfile } from '../../src/auth';
+import { useAuth } from '../../src/auth';
+import { SafetyActions } from '../../src/SafetyActions';
 
 export default function PublicProfileScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { profile: currentProfile } = useAuth();
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -26,7 +29,7 @@ export default function PublicProfileScreen() {
     <PageHeading eyebrow="Perfil público" title={profile?.displayName ?? (loading ? 'Cargando perfil…' : 'Perfil')} detail={profile ? `@${profile.username} · ${profile.accountType === 'rescue_organization' ? 'Organización de rescate' : 'Persona'}` : 'Información compartida por la comunidad.'} />
     {error ? <Notice>{error}</Notice> : null}
     {loading ? <ActivityIndicator color={colors.green} accessibilityLabel="Cargando perfil" /> : null}
-    {profile ? <Card><View style={styles.avatar}><Text style={styles.emoji}>🐾</Text></View><Text style={styles.name}>{profile.displayName}</Text><Text style={styles.copy}>{profile.bio || 'Todavía no agregó una presentación.'}</Text>{profile.locality ? <Text style={styles.copy}>⌖  {profile.locality}</Text> : null}</Card> : null}
+    {profile ? <><Card><View style={styles.avatar}><Text style={styles.emoji}>🐾</Text></View><Text style={styles.name}>{profile.displayName}</Text><Text style={styles.copy}>{profile.bio || 'Todavía no agregó una presentación.'}</Text>{profile.locality ? <Text style={styles.copy}>⌖  {profile.locality}</Text> : null}</Card>{currentProfile?.username !== profile.username ? <SafetyActions username={profile.username} /> : null}</> : null}
   </Screen>;
 }
 

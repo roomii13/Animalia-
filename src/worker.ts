@@ -11,6 +11,7 @@ interface Env {
   MERCADOPAGO_ACCESS_TOKEN?: string;
   MERCADOPAGO_WEBHOOK_SECRET?: string;
   PUBLIC_APP_URL?: string;
+  MODERATOR_EMAILS?: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
 }
 
@@ -26,6 +27,7 @@ interface ProfileRow {
 const encoder = new TextEncoder();
 type Sql = NeonQueryFunction<false, false>;
 const KINDS = ['adoption', 'lost', 'rescue', 'help', 'event'] as const;
+const REPORT_REASONS = ['inappropriate_content', 'animal_welfare', 'spam_or_fraud', 'personal_information', 'other'] as const;
 const TYPE_LABELS: Record<(typeof KINDS)[number], string> = {
   adoption: 'Adopción responsable',
   lost: 'Animal perdido',
@@ -87,7 +89,7 @@ async function sha256(value: string): Promise<string> {
 }
 
 async function passwordHash(password: string, salt = crypto.getRandomValues(new Uint8Array(16))): Promise<string> {
-  const iterations = 310_000;
+  const iterations = 100_000;
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
   const digest = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
   return `pbkdf2$${iterations}$${base64Url(salt)}$${base64Url(new Uint8Array(digest))}`;
@@ -130,6 +132,14 @@ async function currentProfile(request: Request, sql: Sql): Promise<ProfileRow | 
     WHERE s.token_hash = ${tokenHash} AND s.expires_at > now()
     LIMIT 1`;
   return (rows[0] as ProfileRow | undefined) ?? null;
+}
+
+async function isModerator(profileId: string, env: Env, sql: Sql): Promise<boolean> {
+  const moderatorEmails = new Set((env.MODERATOR_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
+  if (!moderatorEmails.size) return false;
+  const rows = await sql`SELECT email FROM public.account_credentials WHERE profile_id = ${profileId} LIMIT 1`;
+  const email = (rows[0] as { email: string } | undefined)?.email.toLowerCase();
+  return Boolean(email && moderatorEmails.has(email));
 }
 
 function profileResponse(profile: ProfileRow): Record<string, unknown> {
@@ -208,6 +218,7 @@ function contributionResponse(row: Record<string, unknown>): Record<string, unkn
   return {
     id: row.id,
     amount: row.amount,
+    purpose: row.purpose ?? 'general',
     currency: row.currency,
     status: row.status,
     createdAt: row.created_at,
@@ -304,7 +315,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     if (path === '/api/payments' && request.method === 'GET') {
       const profile = await currentProfile(request, sql);
       if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
-      const rows = await sql`SELECT id, amount::text AS amount, currency, status, created_at, approved_at
+      const rows = await sql`SELECT id, amount::text AS amount, purpose, currency, status, created_at, approved_at
         FROM public.payment_contributions WHERE profile_id = ${profile.id}
         ORDER BY created_at DESC LIMIT 100`;
       return json(request, { contributions: rows.map((row) => contributionResponse(row as Record<string, unknown>)) });
@@ -317,20 +328,24 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const body = await readJson(request);
       const amount = canonicalArsAmount(body?.amount);
       if (!amount) return json(request, { error: 'INVALID_CONTRIBUTION_AMOUNT' }, 400);
+      const purpose = body?.purpose ?? 'general';
+      if (purpose !== 'general' && purpose !== 'pet_cemetery_land') {
+        return json(request, { error: 'INVALID_CONTRIBUTION_PURPOSE' }, 400);
+      }
 
       const requestKey = request.headers.get('Idempotency-Key') ?? crypto.randomUUID();
       if (!/^[A-Za-z0-9._:-]{1,128}$/.test(requestKey)) {
         return json(request, { error: 'INVALID_IDEMPOTENCY_KEY' }, 400);
       }
       const intents = await sql`
-        INSERT INTO public.payment_contributions (profile_id, idempotency_key, amount)
-        VALUES (${profile.id}, ${requestKey}, ${amount})
+        INSERT INTO public.payment_contributions (profile_id, idempotency_key, amount, purpose)
+        VALUES (${profile.id}, ${requestKey}, ${amount}, ${purpose})
         ON CONFLICT (profile_id, idempotency_key)
         DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
-        RETURNING id, amount::text AS amount, currency, status, mp_order_id, checkout_url, created_at, approved_at
+        RETURNING id, amount::text AS amount, purpose, currency, status, mp_order_id, checkout_url, created_at, approved_at
       `;
       const intent = intents[0] as Record<string, unknown>;
-      if (canonicalArsAmount(intent.amount) !== amount) {
+      if (canonicalArsAmount(intent.amount) !== amount || intent.purpose !== purpose) {
         return json(request, { error: 'IDEMPOTENCY_KEY_REUSED' }, 409);
       }
       if (intent.status !== 'pending') return json(request, { error: 'CONTRIBUTION_ALREADY_PROCESSED' }, 409);
@@ -351,17 +366,22 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       if (appUrl.protocol !== 'https:') return json(request, { error: 'PAYMENTS_UNAVAILABLE' }, 503);
 
       const returnUrl = (result: string) => `${appUrl.origin}/payment-return.html?result=${result}`;
+      const campaign = purpose === 'pet_cemetery_land';
+      const contributionTitle = campaign ? 'Campaña del cementerio de mascotas' : 'Aporte general a Animalia';
+      const contributionDescription = campaign
+        ? 'Aporte voluntario para la compra del terreno del cementerio de mascotas de Animalia'
+        : 'Aporte voluntario para sostener Animalia';
       const mpResponse = await createMercadoPagoOrder(env.MERCADOPAGO_ACCESS_TOKEN, String(intent.id), {
         type: 'online',
         processing_mode: 'manual',
         total_amount: amount,
         external_reference: String(intent.id),
-        description: 'Aporte general a Animalia',
+        description: contributionTitle,
         payer: { email: payerEmail },
         items: [{
-          external_code: 'ANIMALIA-CONTRIBUTION',
-          title: 'Aporte general a Animalia',
-          description: 'Aporte voluntario para sostener Animalia',
+          external_code: campaign ? 'ANIMALIA-PET-CEMETERY-LAND' : 'ANIMALIA-CONTRIBUTION',
+          title: contributionTitle,
+          description: contributionDescription,
           quantity: 1,
           unit_price: amount,
         }],
@@ -397,7 +417,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
             provider_status = ${createdOrder.status ?? 'created'},
             provider_status_detail = ${createdOrder.status_detail ?? null}, updated_at = now()
         WHERE id = ${intent.id} AND status = 'pending'
-        RETURNING id, amount::text AS amount, currency, status, created_at, approved_at`;
+        RETURNING id, amount::text AS amount, purpose, currency, status, created_at, approved_at`;
       const contribution = saved[0] as Record<string, unknown> | undefined;
       if (!contribution) return json(request, { error: 'CONTRIBUTION_ALREADY_PROCESSED' }, 409);
       return json(request, { contribution: contributionResponse(contribution), checkoutUrl: safeCheckoutUrl }, 201);
@@ -408,20 +428,33 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       if (requestedKind && !KINDS.includes(requestedKind as (typeof KINDS)[number])) {
         return json(request, { error: 'INVALID_KIND' }, 400);
       }
+      const viewer = await currentProfile(request, sql);
+      const viewerId = viewer?.id ?? null;
       const rows = requestedKind
         ? await sql`SELECT p.id, p.kind, p.title, p.description, p.animal_name, p.animal_species, p.locality, p.image_url, p.created_at, u.username, u.display_name
           FROM public.posts p JOIN public.profiles u ON u.id = p.author_id
-          WHERE p.status = 'published' AND p.kind = ${requestedKind} ORDER BY p.created_at DESC LIMIT 50`
+          WHERE p.status = 'published' AND p.kind = ${requestedKind}
+            AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = ${viewerId} AND b.blocked_id = p.author_id)
+            AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = p.author_id AND b.blocked_id = ${viewerId})
+          ORDER BY p.created_at DESC LIMIT 50`
         : await sql`SELECT p.id, p.kind, p.title, p.description, p.animal_name, p.animal_species, p.locality, p.image_url, p.created_at, u.username, u.display_name
           FROM public.posts p JOIN public.profiles u ON u.id = p.author_id
-          WHERE p.status = 'published' ORDER BY p.created_at DESC LIMIT 50`;
+          WHERE p.status = 'published'
+            AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = ${viewerId} AND b.blocked_id = p.author_id)
+            AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = p.author_id AND b.blocked_id = ${viewerId})
+          ORDER BY p.created_at DESC LIMIT 50`;
       const posts = rows.map((row) => postResponse(row));
       return json(request, { posts });
     }
 
     const postPath = path.match(/^\/api\/posts\/([0-9a-f-]{36})$/i);
     if (postPath && request.method === 'GET') {
-      const rows = await sql`${sql.unsafe(POST_SELECT)} WHERE p.status = 'published' AND p.id = ${postPath[1]} LIMIT 1`;
+      const viewer = await currentProfile(request, sql);
+      const viewerId = viewer?.id ?? null;
+      const rows = await sql`${sql.unsafe(POST_SELECT)} WHERE p.status = 'published' AND p.id = ${postPath[1]}
+        AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = ${viewerId} AND b.blocked_id = p.author_id)
+        AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = p.author_id AND b.blocked_id = ${viewerId})
+        LIMIT 1`;
       return rows[0] ? json(request, { post: postResponse(rows[0]) }) : json(request, { error: 'POST_NOT_FOUND' }, 404);
     }
 
@@ -447,8 +480,104 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
       const rows = await sql`SELECT p.id, p.kind, p.title, p.description, p.animal_name, p.animal_species, p.locality, p.image_url, p.created_at, u.username, u.display_name
         FROM public.saved_posts s JOIN public.posts p ON p.id = s.post_id JOIN public.profiles u ON u.id = p.author_id
-        WHERE s.profile_id = ${profile.id} AND p.status = 'published' ORDER BY s.created_at DESC LIMIT 100`;
+        WHERE s.profile_id = ${profile.id} AND p.status = 'published'
+          AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = ${profile.id} AND b.blocked_id = p.author_id)
+          AND NOT EXISTS (SELECT 1 FROM public.blocked_profiles b WHERE b.blocker_id = p.author_id AND b.blocked_id = ${profile.id})
+        ORDER BY s.created_at DESC LIMIT 100`;
       return json(request, { posts: rows.map((row) => postResponse(row)) });
+    }
+
+    if (path === '/api/blocks' && request.method === 'GET') {
+      const profile = await currentProfile(request, sql);
+      if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
+      const rows = await sql`SELECT p.username, p.display_name, b.created_at AS blocked_at
+        FROM public.blocked_profiles b JOIN public.profiles p ON p.id = b.blocked_id
+        WHERE b.blocker_id = ${profile.id} ORDER BY b.created_at DESC`;
+      return json(request, { blockedProfiles: rows.map((row) => ({ username: row.username, displayName: row.display_name, blockedAt: row.blocked_at })) });
+    }
+
+    const blockPath = path.match(/^\/api\/blocks\/([a-z0-9_]{3,30})$/i);
+    if (blockPath && ['POST', 'DELETE'].includes(request.method)) {
+      const profile = await currentProfile(request, sql);
+      if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
+      const targetRows = await sql`SELECT id FROM public.profiles WHERE username = ${blockPath[1].toLowerCase()} LIMIT 1`;
+      const targetId = (targetRows[0] as { id: string } | undefined)?.id;
+      if (!targetId) return json(request, { error: 'PROFILE_NOT_FOUND' }, 404);
+      if (targetId === profile.id) return json(request, { error: 'CANNOT_BLOCK_SELF' }, 400);
+      if (request.method === 'POST') {
+        await sql`INSERT INTO public.blocked_profiles (blocker_id, blocked_id)
+          VALUES (${profile.id}, ${targetId}) ON CONFLICT (blocker_id, blocked_id) DO NOTHING`;
+        return json(request, { blocked: true });
+      }
+      await sql`DELETE FROM public.blocked_profiles WHERE blocker_id = ${profile.id} AND blocked_id = ${targetId}`;
+      return json(request, { blocked: false });
+    }
+
+    if (path === '/api/reports' && request.method === 'POST') {
+      const profile = await currentProfile(request, sql);
+      if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
+      const body = await readJson(request);
+      const postId = typeof body?.postId === 'string' && /^[0-9a-f-]{36}$/i.test(body.postId) ? body.postId : null;
+      const username = typeof body?.username === 'string' && /^[a-z0-9_]{3,30}$/i.test(body.username) ? body.username.toLowerCase() : null;
+      const reason = typeof body?.reason === 'string' ? body.reason : '';
+      const details = typeof body?.details === 'string' ? body.details.trim().slice(0, 1000) || null : null;
+      if ((!postId && !username) || (postId && username) || !REPORT_REASONS.includes(reason as (typeof REPORT_REASONS)[number])) {
+        return json(request, { error: 'INVALID_REPORT' }, 400);
+      }
+      let targetProfileId: string | null = null;
+      if (postId) {
+        const targetRows = await sql`SELECT author_id FROM public.posts WHERE id = ${postId} AND status = 'published' LIMIT 1`;
+        targetProfileId = (targetRows[0] as { author_id: string } | undefined)?.author_id ?? null;
+        if (!targetProfileId) return json(request, { error: 'POST_NOT_FOUND' }, 404);
+      } else {
+        const targetRows = await sql`SELECT id FROM public.profiles WHERE username = ${username} LIMIT 1`;
+        targetProfileId = (targetRows[0] as { id: string } | undefined)?.id ?? null;
+        if (!targetProfileId) return json(request, { error: 'PROFILE_NOT_FOUND' }, 404);
+      }
+      if (targetProfileId === profile.id) return json(request, { error: 'CANNOT_REPORT_SELF' }, 400);
+      const existingRows = postId
+        ? await sql`SELECT 1 FROM public.reports WHERE reporter_id = ${profile.id} AND post_id = ${postId} LIMIT 1`
+        : await sql`SELECT 1 FROM public.reports WHERE reporter_id = ${profile.id} AND reported_profile_id = ${targetProfileId} AND post_id IS NULL LIMIT 1`;
+      if (existingRows.length) return json(request, { error: 'REPORT_ALREADY_SUBMITTED' }, 409);
+      await sql`INSERT INTO public.reports (reporter_id, post_id, reported_profile_id, reason, details)
+        VALUES (${profile.id}, ${postId}, ${targetProfileId}, ${reason}, ${details})`;
+      return json(request, { submitted: true }, 201);
+    }
+
+    if (path === '/api/admin/reports' && request.method === 'GET') {
+      const profile = await currentProfile(request, sql);
+      if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
+      if (!(await isModerator(profile.id, env, sql))) return json(request, { error: 'FORBIDDEN' }, 403);
+      const rows = await sql`SELECT r.id, r.status, r.reason, r.details, r.created_at,
+          r.post_id, r.reported_profile_id, p.title AS post_title, p.status AS post_status,
+          reporter.username AS reporter_username, target.username AS reported_username,
+          target.display_name AS reported_display_name
+        FROM public.reports r
+        JOIN public.profiles reporter ON reporter.id = r.reporter_id
+        LEFT JOIN public.profiles target ON target.id = r.reported_profile_id
+        LEFT JOIN public.posts p ON p.id = r.post_id
+        WHERE r.status IN ('open', 'reviewing')
+        ORDER BY CASE r.status WHEN 'open' THEN 0 WHEN 'reviewing' THEN 1 ELSE 2 END, r.created_at DESC
+        LIMIT 200`;
+      return json(request, { reports: rows });
+    }
+
+    const adminReportPath = path.match(/^\/api\/admin\/reports\/([0-9a-f-]{36})$/i);
+    if (adminReportPath && request.method === 'PATCH') {
+      const profile = await currentProfile(request, sql);
+      if (!profile) return json(request, { error: 'UNAUTHENTICATED' }, 401);
+      if (!(await isModerator(profile.id, env, sql))) return json(request, { error: 'FORBIDDEN' }, 403);
+      const body = await readJson(request);
+      const status = typeof body?.status === 'string' ? body.status : '';
+      if (!['reviewing', 'resolved', 'dismissed'].includes(status)) return json(request, { error: 'INVALID_REPORT_STATUS' }, 400);
+      const reportRows = await sql`SELECT post_id FROM public.reports WHERE id = ${adminReportPath[1]} LIMIT 1`;
+      if (!reportRows.length) return json(request, { error: 'REPORT_NOT_FOUND' }, 404);
+      if (body?.removePost === true && (reportRows[0] as { post_id: string | null }).post_id) {
+        await sql`UPDATE public.posts SET status = 'removed', updated_at = now()
+          WHERE id = ${(reportRows[0] as { post_id: string }).post_id}`;
+      }
+      await sql`UPDATE public.reports SET status = ${status} WHERE id = ${adminReportPath[1]}`;
+      return json(request, { updated: true });
     }
 
     if (path === '/api/auth/register' && request.method === 'POST') {
@@ -465,16 +594,23 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const baseName = displayName.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 20) || 'animalia';
       const username = `${baseName}_${suffix}`.slice(0, 30);
       const storedPassword = await passwordHash(password);
+      const token = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+      const tokenHash = await sha256(token);
       const rows = await sql`WITH new_profile AS (
           INSERT INTO public.profiles (id, username, display_name, account_type)
           VALUES (${id}, ${username}, ${displayName}, ${accountType})
           RETURNING id
+        ), new_credentials AS (
+          INSERT INTO public.account_credentials (profile_id, email, password_hash)
+          SELECT id, ${email}, ${storedPassword} FROM new_profile
+          RETURNING profile_id
+        ), new_session AS (
+          INSERT INTO public.auth_sessions (token_hash, profile_id, expires_at)
+          SELECT ${tokenHash}, profile_id, now() + interval '30 days' FROM new_credentials
+          RETURNING profile_id
         )
-        INSERT INTO public.account_credentials (profile_id, email, password_hash)
-        SELECT id, ${email}, ${storedPassword} FROM new_profile
-        RETURNING profile_id`;
+        SELECT profile_id FROM new_session`;
       if (!rows.length) return json(request, { error: 'REGISTRATION_FAILED' }, 400);
-      const token = await issueSession(sql, id);
       const profile = { id, username, display_name: displayName, account_type: accountType, bio: null, locality: null } as ProfileRow;
       return json(request, { token, profile: profileResponse(profile) }, 201);
     }
@@ -549,8 +685,14 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
 
     return json(request, { error: 'NOT_FOUND' }, 404);
   } catch (error) {
-    if (path === '/api/auth/register' && isRecord(error) && error.code === '23505') {
-      return json(request, { error: 'EMAIL_ALREADY_REGISTERED' }, 409);
+    if (path === '/api/auth/register' && isRecord(error)) {
+      const code = typeof error.code === 'string' ? error.code : '';
+      const constraint = typeof error.constraint === 'string' ? error.constraint : '';
+      if (code === '23505' && constraint === 'account_credentials_email_key') {
+        return json(request, { error: 'EMAIL_ALREADY_REGISTERED' }, 409);
+      }
+      console.error('Animalia registration failed', { code: code || 'unknown', constraint: constraint || 'unknown' });
+      return json(request, { error: 'REGISTRATION_FAILED' }, 500);
     }
     console.error('Animalia API request failed', error instanceof Error ? error.name : 'unknown');
     return json(request, { error: 'INTERNAL_ERROR' }, 500);

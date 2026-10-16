@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, router } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Brand, Card, Notice, PageHeading, Pill, Screen } from '../../src/ui';
 import { categories } from '../../src/data';
@@ -13,7 +14,8 @@ export default function FeedScreen() {
 
   return <Screen>
     <View style={styles.top}><Brand /><Pressable onPress={() => router.push('/post/new')} style={styles.create}><Text style={styles.createText}>＋</Text></Pressable></View>
-    <View style={styles.hero}><Text style={styles.heroEyebrow}>BIENESTAR ANIMAL EN COMUNIDAD</Text><Text style={styles.heroTitle}>Cuidar también es encontrarnos.</Text><Text style={styles.heroText}>Adopciones, rescates y personas que se unen para ayudar.</Text><Pressable onPress={() => router.push('/explore')} style={styles.heroButton}><Text style={styles.heroButtonText}>Explorar la comunidad  ›</Text></Pressable></View>
+    <View style={styles.hero}><Text style={styles.heroEyebrow}>BIENESTAR ANIMAL EN COMUNIDAD</Text><Text style={styles.heroTitle}>Cuidar también es encontrarnos.</Text><Text style={styles.heroText}>Adopciones, rescates y personas que se unen para ayudar.</Text></View>
+    <Pressable accessibilityRole="button" accessibilityLabel="Apoyar la campaña para comprar el terreno del cementerio de mascotas" onPress={() => router.push({ pathname: '/donate', params: { purpose: 'pet_cemetery_land' } })} style={({ pressed }) => [styles.donateButton, pressed && styles.donatePressed]}><Ionicons name="heart" size={21} color="#fff" /><Text style={styles.donateText}>Campaña: cementerio de mascotas</Text><Ionicons name="arrow-forward" size={18} color="#fff" /></Pressable>
     <PageHeading eyebrow="Comunidad Animalia" title="Lo que está pasando" detail="Elegí un tema para explorar los avisos." />
     {error ? <Notice>{error}</Notice> : null}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>{categories.map((item) => <Pill key={item} label={item} selected={category === item} onPress={() => setCategory(item)} />)}</ScrollView>
@@ -32,8 +34,9 @@ const styles = StyleSheet.create({
   heroEyebrow: { color: '#efc98f', fontWeight: '800', fontSize: 10, letterSpacing: 1.1 },
   heroTitle: { color: '#fffaf2', fontSize: 29, fontWeight: '800', lineHeight: 34, letterSpacing: -0.6 },
   heroText: { color: '#e3ecdf', fontSize: 14, lineHeight: 20 },
-  heroButton: { alignSelf: 'flex-start', marginTop: 5, paddingVertical: 11, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.orange },
-  heroButtonText: { color: '#3b4029', fontSize: 12, fontWeight: '800' },
+  donateButton: { minHeight: 54, paddingHorizontal: 18, borderRadius: 16, backgroundColor: colors.orange, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  donatePressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
+  donateText: { color: '#3b4029', fontSize: 14, fontWeight: '800', flexShrink: 1 },
   pills: { gap: 8, paddingRight: 20 },
   animal: { height: 142, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
   animalEmoji: { fontSize: 72 },

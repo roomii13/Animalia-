@@ -7,6 +7,7 @@ export type AnimalPost = {
   animal: string;
   location: string;
   author: string;
+  username?: string;
   emoji: string;
   tint: string;
 };
